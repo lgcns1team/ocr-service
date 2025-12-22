@@ -1,0 +1,36 @@
+// Python 서비스는 Gradle로 빌드하지 않음
+afterEvaluate {
+    tasks.findAll { it.name in ['build', 'jar', 'bootJar'] }.each { it.enabled = false }
+}
+
+// Python 서비스 실행을 위한 태스크
+task runOcrService(type: Exec) {
+    group = 'application'
+    description = 'OCR 서비스를 실행합니다'
+    
+    def port = System.getenv('OCR_SERVICE_PORT') ?: '8086'
+    
+    if (System.getProperty('os.name').toLowerCase().contains('windows')) {
+        commandLine 'cmd', '/c', 'uvicorn', 'app.main:app', '--host', '0.0.0.0', '--port', port
+    } else {
+        commandLine 'uvicorn', 'app.main:app', '--host', '0.0.0.0', '--port', port
+    }
+    
+    workingDir = projectDir
+}
+
+// Python 의존성 설치 태스크
+task installPythonDeps(type: Exec) {
+    group = 'setup'
+    description = 'Python 의존성을 설치합니다'
+    
+    if (System.getProperty('os.name').toLowerCase().contains('windows')) {
+        commandLine 'cmd', '/c', 'pip', 'install', '-r', 'requirements.txt'
+    } else {
+        commandLine 'pip', 'install', '-r', 'requirements.txt'
+    }
+    
+    workingDir = projectDir
+}
+
+

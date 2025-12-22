@@ -1,0 +1,7 @@
+venv/
+win-venv/
+__pycache__/
+.vscode/
+.idea/
+*.pyc
+.env
