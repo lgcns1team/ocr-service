@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.responses import JSONResponse
 from app.ocr.engine import OcrEngine
 import os
@@ -11,21 +11,30 @@ app = FastAPI(title="OCR Service", version="1.0.0")
 ocr_engine = OcrEngine()
 
 @app.post("/api/ocr/analyze")
-async def analyze_document(file: UploadFile = File(...)):
+async def analyze_document(file: UploadFile = File(...), role: str = Form(None)):
     """
     이미지 파일에서 텍스트를 추출하고 분석
     
     Args:
         file: 분석할 이미지 파일
+        role: 사용자 역할 (HELPER 또는 DISABLED, 선택사항)
         
     Returns:
         OCR 분석 결과 (extractedText, confidence, ocrScore, keywords)
     """
     try:
-        logger.info(f"OCR 분석 요청: {file.filename}")
+        logger.info(f"OCR 분석 요청: {file.filename}, role: {role}")
         
         image_bytes = await file.read()
-        result = ocr_engine.analyze(image_bytes)
+        result = ocr_engine.analyze(image_bytes, role)
+        
+        
+        # 디버깅용 로그
+        print(f"=== OCR 분석 결과 ===")
+        print(f"Text (처음 200자): {result['text'][:200] if result.get('text') else 'None'}...")
+        print(f"Fields: {result.get('fields', {})}")
+        print(f"Names: {result.get('names', [])}")
+        print(f"====================")
         
         return {
             "extractedText": result["text"],
