@@ -22,17 +22,36 @@ class OcrEngine:
     def __init__(self):
         logger.info("OCR 엔진 초기화 중...")
         # PaddleOCR 초기화 (텍스트 위치 탐지용)
-        self.reader = PaddleOCR(
-            lang='korean',
-            use_gpu=False,
-            use_angle_cls=True,
-            det_db_thresh=0.2,
-            det_db_box_thresh=0.5,
-            drop_score=0.05,
-            rec_batch_num=6,
-            max_text_length=25,
-            show_log=False
-        )
+        # PaddleOCR 3.0 이상에서는 여러 파라미터가 제거/변경되었으므로 하위 호환성 처리
+        # 2.7.3 버전: 모든 튜닝 파라미터 사용
+        # 3.0+ 버전: 기본 파라미터만 사용 (튜닝 값은 모델 설정에서 관리)
+        try:
+            # 2.7.3 버전: 모든 튜닝 파라미터 지원
+            self.reader = PaddleOCR(
+                lang='korean',
+                use_gpu=False,
+                use_angle_cls=True,
+                det_db_thresh=0.2,
+                det_db_box_thresh=0.5,
+                drop_score=0.05,
+                rec_batch_num=6,
+                max_text_length=25,
+                show_log=False
+            )
+        except ValueError as e:
+            error_msg = str(e)
+            # 3.0+ 버전: 변경된/제거된 파라미터 처리
+            if "max_text_length" in error_msg or "drop_score" in error_msg or "det_db_thresh" in error_msg:
+                logger.warning(f"PaddleOCR 3.0+ 감지: 변경된 파라미터 제외하고 초기화 (에러: {error_msg})")
+                # 3.0+ 버전: 기본 파라미터만 사용
+                self.reader = PaddleOCR(
+                    lang='korean',
+                    use_gpu=False,
+                    use_angle_cls=True,
+                    show_log=False
+                )
+            else:
+                raise
         
         # EasyOCR 초기화 (정밀 한글 인식용)
         logger.info("EasyOCR 모델 로드 중...")

@@ -6,8 +6,13 @@ pillow==10.1.0
 # Python 3.12 지원되는 빌드용으로 상향
 numpy==1.26.4
 paddlepaddle==2.6.2
-paddleocr>=2.7.3
+paddleocr==2.7.3
 # Python 3.12 호환성 확보를 위해 최신 버전 사용
+
+torch==2.2.2
+torchvision==0.17.2
+torchaudio==2.2.2
+
 pymupdf>=1.24.2
 httpx
 
