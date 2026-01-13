@@ -35,7 +35,7 @@ def process_ocr(image_bytes: bytes, role: str = None):
         "fields": result.get("fields", {})
     }
 
-@app.post("/api/ocr/extract")
+@app.post("ocr/api/ocr/extract")
 async def extract_from_url(request: OcrUrlRequest):
     """
     S3 URL에서 이미지를 다운로드하여 텍스트 추출
@@ -58,7 +58,7 @@ async def extract_from_url(request: OcrUrlRequest):
             content={"error": "OCR 처리에 실패했습니다.", "message": str(e)}
         )
 
-@app.post("/api/ocr/analyze")
+@app.post("ocr/api/ocr/analyze")
 async def analyze_document(file: UploadFile = File(...), role: str = Form(None)):
     """
     이미지 파일에서 텍스트를 추출하고 분석 (기존 방식)
