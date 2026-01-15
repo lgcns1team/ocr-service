@@ -2,9 +2,11 @@ from fastapi import FastAPI, File, UploadFile, Form, Body
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from app.ocr.engine import OcrEngine
+from time import perf_counter
 import os
 import httpx
 import logging
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -41,6 +43,7 @@ async def extract_from_url(request: OcrUrlRequest):
     S3 URL에서 이미지를 다운로드하여 텍스트 추출
     """
     try:
+        start_time = perf_counter()
         logger.info(f"URL 기반 OCR 추출 요청: {request.fileUrl}, role: {request.role}")
         
         async with httpx.AsyncClient() as client:
@@ -49,7 +52,12 @@ async def extract_from_url(request: OcrUrlRequest):
                 raise Exception(f"이미지 다운로드 실패 (상태 코드: {response.status_code})")
             image_bytes = response.content
             
-        return process_ocr(image_bytes, request.role)
+
+        result = process_ocr(image_bytes, request.role)
+
+        end_time = perf_counter()
+        logger.info(f"URL 기반 OCR 추출 완료: {end_time - start_time:.2f}초")
+        return result
         
     except Exception as e:
         logger.error(f"URL OCR 추출 실패: {str(e)}", exc_info=True)
