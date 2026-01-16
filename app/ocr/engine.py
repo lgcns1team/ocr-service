@@ -129,8 +129,13 @@ class OcrEngine:
             except Exception as ee:
                 logger.warning(f"EasyOCR 분석 실패: {ee}")
 
-            # 3. 데이터 추출 (행 단위 문맥 분석)
-            fields = self._extract_fields_anchor_based(results)
+            # 3. 데이터 추출 (역할에 따라 분기)
+            if role == "DISABLED":
+                # 장애인: 복지카드 전용 추출 로직
+                fields = self._extract_fields_disability_card(results, full_text=" ".join(texts))
+            else:
+                # 도우미(HELPER) 또는 기본: 활동지원사 이수증 추출 로직
+                fields = self._extract_fields_anchor_based(results)
             
             # 4. 하이브리드 앙상블 적용 (EasyOCR 결과로 필드 보정)
             if easy_results:
@@ -159,6 +164,86 @@ class OcrEngine:
         except Exception as e:
             logger.error(f"OCR 분석 중 오류 발생: {str(e)}", exc_info=True)
             raise
+    
+    def _extract_fields_disability_card(self, results, full_text: str = "") -> dict:
+        """
+        장애인 복지카드/등록증 전용 필드 추출
+        
+        복지카드에서 추출 가능한 정보:
+        - title: 복지카드 또는 장애인등록증
+        - name: 성명
+        - disability_type: 장애유형 (예: 지체장애)
+        - disability_grade: 장애등급 (예: 5급)
+        """
+        fields = {}
+        if not results and not full_text:
+            return fields
+        
+        # OCR 결과에서 전체 텍스트 추출
+        if not full_text:
+            texts = []
+            for r in results:
+                if len(r) >= 2:
+                    texts.append(r[1].strip() if isinstance(r[1], str) else str(r[1]))
+            full_text = " ".join(texts)
+        
+        logger.info(f"[복지카드] OCR 전체 텍스트: {full_text}")
+        
+        # [제목] - 복지카드 또는 장애인등록증 인식
+        if re.search(r'복\s*지\s*카\s*드', full_text):
+            fields['title'] = '복지카드'
+        elif re.search(r'장\s*애\s*인\s*등\s*록\s*증', full_text):
+            fields['title'] = '장애인등록증'
+        elif re.search(r'장\s*애\s*인\s*증', full_text):
+            fields['title'] = '장애인증'
+        
+        # [성명] - 한글 이름 패턴 (2-4자)
+        # 복지카드의 경우 큰 글씨로 이름이 표시됨
+        # "성명" 라벨이 없을 수 있으므로 한글 2-4자 패턴 직접 탐색
+        name_candidates = re.findall(r'([가-힣]{2,4})', full_text)
+        # 제외 키워드
+        exclude_keywords = ['복지카드', '장애인', '등록증', '지체장애', '뇌병변', '시각장애', 
+                          '청각장애', '언어장애', '지적장애', '자폐성', '정신장애', '신장장애',
+                          '심장장애', '호흡기', '간장애', '안면장애', '장루요루', '뇌전증',
+                          '충청북도', '충청남도', '경기도', '서울특별시', '부산광역시',
+                          '청원군', '청원군수', '발급일']
+        
+        for candidate in name_candidates:
+            if candidate not in exclude_keywords and len(candidate) >= 2:
+                fields['name'] = candidate
+                break
+        
+        # [장애유형] - 지체장애, 뇌병변장애, 시각장애 등
+        disability_types = [
+            '지체장애', '뇌병변장애', '시각장애', '청각장애', '언어장애',
+            '지적장애', '자폐성장애', '정신장애', '신장장애', '심장장애',
+            '호흡기장애', '간장애', '안면장애', '장루요루장애', '뇌전증장애'
+        ]
+        for dtype in disability_types:
+            # 공백이 있을 수 있으므로 유연하게 매칭
+            pattern = r'\s*'.join(list(dtype))
+            if re.search(pattern, full_text):
+                fields['disability_type'] = dtype
+                break
+        
+        # 간단한 패턴 (예: "지체장애" without 장애 suffix)
+        if not fields.get('disability_type'):
+            simple_match = re.search(r'(지체|뇌병변|시각|청각|언어|지적|자폐성|정신|신장|심장|호흡기|간|안면|장루요루|뇌전증)\s*장?\s*애?', full_text)
+            if simple_match:
+                fields['disability_type'] = simple_match.group(0).replace(' ', '') + '장애'
+        
+        # [장애등급] - 1급~6급 또는 중증/경증
+        grade_match = re.search(r'([1-6])\s*급', full_text)
+        if grade_match:
+            fields['disability_grade'] = f"{grade_match.group(1)}급"
+        else:
+            if re.search(r'중\s*증', full_text):
+                fields['disability_grade'] = '중증'
+            elif re.search(r'경\s*증', full_text):
+                fields['disability_grade'] = '경증'
+        
+        logger.info(f"[복지카드] 최종 추출 결과: {fields}")
+        return fields
     
     def _extract_fields_anchor_based(self, results) -> dict:
         """
